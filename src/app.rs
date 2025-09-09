@@ -1,11 +1,18 @@
 use crate::file;
 use anyhow::Result;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use ratatui::layout::Position;
+use ratatui::text::{Line, Span, Text};
 use ratatui::{DefaultTerminal, Frame, widgets::Paragraph};
 
 pub struct App {
     pub path: std::path::PathBuf,
     pub content: String,
+    pub buffer: Vec<String>,
+    pub cursor_row: usize,
+    pub cursor_col: usize,
+    pub scroll_row: usize,
+    pub scroll_col: usize,
 }
 
 impl App {
@@ -13,6 +20,11 @@ impl App {
         Self {
             path,
             content: String::new(),
+            buffer: Vec::new(),
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_row: 0,
+            scroll_col: 0,
         }
     }
 
@@ -21,6 +33,7 @@ impl App {
             Ok(content) => content,
             Err(e) => format!("Error: {}", e),
         };
+        self.buffer = self.content.split('\n').map(|s| s.to_string()).collect();
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -36,18 +49,54 @@ impl App {
         loop {
             terminal.draw(|f| self.render(f))?;
 
-            if let Event::Key(event::KeyEvent {
-                code: event::KeyCode::Char('q'),
-                modifiers: event::KeyModifiers::CONTROL,
-                ..
-            }) = event::read()?
+            if let Event::Key(key) = event::read()?
+                && key.kind == event::KeyEventKind::Press
             {
-                break Ok(());
+                match key.code {
+                    KeyCode::Left => {
+                        if self.cursor_col > 0 {
+                            self.cursor_col -= 1;
+                        }
+                    }
+                    KeyCode::Right => {
+                        if self.cursor_col < self.buffer[self.cursor_row].len() {
+                            self.cursor_col += 1;
+                        }
+                    }
+                    KeyCode::Up => {
+                        if self.cursor_row > 0 {
+                            self.cursor_row -= 1;
+                            self.cursor_col =
+                                self.cursor_col.min(self.buffer[self.cursor_row].len());
+                        }
+                    }
+                    KeyCode::Down => {
+                        if self.cursor_row + 1 < self.buffer.len() {
+                            self.cursor_row += 1;
+                            self.cursor_col =
+                                self.cursor_col.min(self.buffer[self.cursor_row].len());
+                        }
+                    }
+                    KeyCode::Char('q') if key.modifiers == KeyModifiers::CONTROL => {
+                        break Ok(());
+                    }
+                    _ => {}
+                }
             }
         }
     }
 
     fn render(&self, frame: &mut Frame) {
-        frame.render_widget(Paragraph::new(self.content.clone()), frame.area());
+        let lines: Vec<Line> = self
+            .buffer
+            .iter()
+            .map(|l| Line::from(Span::raw(l.clone())))
+            .collect();
+        let text = Text::from(lines);
+        frame.render_widget(Paragraph::new(text), frame.area());
+        frame.set_cursor_position(Position::new(
+            (self.cursor_col - self.scroll_col) as u16,
+            (self.cursor_row - self.scroll_row) as u16,
+        ));
     }
 }
