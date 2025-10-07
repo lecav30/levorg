@@ -9,6 +9,13 @@ pub fn read_file(path: &Path) -> Result<String> {
     Ok(content)
 }
 
+pub fn write_file(path: &Path, content: String) -> Result<()> {
+    fs::write(path, content)
+        .with_context(|| format!("Can't write file {}", path.to_string_lossy()))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
