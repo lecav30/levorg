@@ -109,16 +109,28 @@ impl App {
                     _ => {}
                 }
             }
+
+            // Auto-scroll
+            let height = terminal.size()?.height as usize;
+
+            if self.cursor_row < self.scroll_row {
+                self.scroll_row = self.cursor_row;
+            } else if self.cursor_row >= self.scroll_row + height {
+                self.scroll_row = self.cursor_row - height + 1;
+            }
         }
     }
 
-    fn render(&self, frame: &mut Frame) {
+    fn render(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        let height = frame.area().height as usize;
         frame.render_widget(Clear, area); // Clean the prev content
 
         let lines: Vec<Line> = self
             .buffer
             .iter()
+            .skip(self.scroll_row)
+            .take(height)
             .map(|l| Line::from(Span::raw(l.clone())))
             .collect();
 
