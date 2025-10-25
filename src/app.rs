@@ -170,6 +170,14 @@ impl App {
         let height = frame.area().height as usize;
         frame.render_widget(Clear, area); // Clean the prev content
 
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),    // editor
+                Constraint::Length(3), // status bar
+            ])
+            .split(area);
+
         let lines: Vec<Line> = self
             .buffer
             .iter()
@@ -179,20 +187,35 @@ impl App {
             .collect();
         let text = Text::from(lines);
 
+        let status_block = Block::default()
+            .border_style(Style::default())
+            .border_type(BorderType::Rounded)
+            .borders(Borders::TOP | Borders::BOTTOM);
+        let status_block_inner = status_block.inner(layout[1]);
+
+        let status_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(status_block_inner);
+
         let status_paragraph = Paragraph::new(self.status_message.clone())
             .style(Style::default().fg(self.status_color))
-            .alignment(Alignment::Left);
+            .alignment(Alignment::Right);
 
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(0),    // editor
-                Constraint::Length(1), // status bar
-            ])
-            .split(area);
+        let filename = Paragraph::new(
+            self.path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("[sin nombre]") // default value: None
+                .to_string(),
+        );
 
         frame.render_widget(Paragraph::new(text), layout[0]);
-        frame.render_widget(status_paragraph, layout[1]);
+
+        frame.render_widget(status_block, layout[1]);
+
+        frame.render_widget(filename, status_layout[0]);
+        frame.render_widget(status_paragraph, status_layout[1]);
 
         frame.set_cursor_position(Position::new(
             (self.cursor_col - self.scroll_col) as u16,
@@ -201,7 +224,7 @@ impl App {
 
         if self.popup_show {
             let popup = Block::bordered().title(self.popup_title.to_string());
-            let popup_area = self.centered_area(area, 60, 40);
+            let popup_area = self.centered_area(area, 60, 40, 40, 10, 80, 25);
             let popup_inner_area = popup.inner(popup_area);
             let popup_layout = Layout::default()
                 .direction(Direction::Vertical)
@@ -214,8 +237,10 @@ impl App {
             let message = Paragraph::new(self.popup_message.to_string())
                 .alignment(Alignment::Center)
                 .block(Block::default().padding(Padding::uniform(1)));
+
             let confirm_button = Paragraph::new("[Y]es")
                 .style(Style::default().fg(Color::LightGreen))
+                .alignment(Alignment::Center)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
@@ -223,11 +248,13 @@ impl App {
                 );
             let cancel_button = Paragraph::new("[N]o")
                 .style(Style::default().fg(Color::Red))
+                .alignment(Alignment::Center)
                 .block(
                     Block::default()
                         .borders(Borders::ALL)
                         .border_type(BorderType::Rounded),
                 );
+
             frame.render_widget(Clear, popup_area);
             frame.render_widget(popup, popup_area);
             frame.render_widget(message, popup_layout[0]);
@@ -236,25 +263,25 @@ impl App {
         }
     }
 
-    fn centered_area(&mut self, area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-        let vertical = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage((100 - percent_y) / 2),
-                Constraint::Percentage(percent_y),
-                Constraint::Percentage((100 - percent_y) / 2),
-            ])
-            .split(area);
+    fn centered_area(
+        &self,
+        area: Rect,
+        percent_x: u16,
+        percent_y: u16,
+        min_width: u16,
+        min_height: u16,
+        max_width: u16,
+        max_height: u16,
+    ) -> Rect {
+        let mut popup_width = area.width * percent_x / 100;
+        let mut popup_height = area.height * percent_y / 100;
 
-        let horizontal = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage((100 - percent_x) / 2),
-                Constraint::Percentage(percent_x),
-                Constraint::Percentage((100 - percent_x) / 2),
-            ])
-            .split(vertical[1]);
+        popup_width = popup_width.clamp(min_width, max_width);
+        popup_height = popup_height.clamp(min_height, max_height);
 
-        horizontal[1]
+        let x = area.x + (area.width.saturating_sub(popup_width)) / 2;
+        let y = area.y + (area.height.saturating_sub(popup_height)) / 2;
+
+        Rect::new(x, y, popup_width, popup_height)
     }
 }
