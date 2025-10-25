@@ -19,6 +19,8 @@ pub struct App {
     pub popup_show: bool,
     pub popup_title: String,
     pub popup_message: String,
+    pub status_message: String,
+    pub status_color: Color,
 }
 
 impl App {
@@ -35,6 +37,8 @@ impl App {
             popup_show: false,
             popup_title: String::new(),
             popup_message: String::new(),
+            status_message: String::new(),
+            status_color: Color::White,
         }
     }
 
@@ -118,6 +122,8 @@ impl App {
                         KeyCode::Char('s') if key.modifiers == KeyModifiers::CONTROL => {
                             self.dirty = false;
                             file::write_file(&self.path, self.buffer.join("\n"))?;
+                            self.status_message = "Guardado ✓".to_string();
+                            self.status_color = Color::Green;
                         }
                         KeyCode::Char(c) if key.modifiers == KeyModifiers::NONE => {
                             self.dirty = true;
@@ -171,9 +177,22 @@ impl App {
             .take(height)
             .map(|l| Line::from(Span::raw(l.clone())))
             .collect();
-
         let text = Text::from(lines);
-        frame.render_widget(Paragraph::new(text), area);
+
+        let status_paragraph = Paragraph::new(self.status_message.clone())
+            .style(Style::default().fg(self.status_color))
+            .alignment(Alignment::Left);
+
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(0),    // editor
+                Constraint::Length(1), // status bar
+            ])
+            .split(area);
+
+        frame.render_widget(Paragraph::new(text), layout[0]);
+        frame.render_widget(status_paragraph, layout[1]);
 
         frame.set_cursor_position(Position::new(
             (self.cursor_col - self.scroll_col) as u16,
