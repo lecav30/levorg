@@ -23,6 +23,20 @@ pub struct App {
     pub status_color: Color,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Percent {
+    pub x: u16,
+    pub y: u16,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub min_width: u16,
+    pub min_height: u16,
+    pub max_width: u16,
+    pub max_height: u16,
+}
+
 impl App {
     pub fn new(path: std::path::PathBuf) -> Self {
         Self {
@@ -64,10 +78,10 @@ impl App {
         loop {
             terminal.draw(|f| self.render(f))?;
 
-            if self.popup_show {
-                if let Event::Key(key) = event::read()?
-                    && key.kind == event::KeyEventKind::Press
-                {
+            if let Event::Key(key) = event::read()?
+                && key.kind == event::KeyEventKind::Press
+            {
+                if self.popup_show {
                     match key.code {
                         KeyCode::Char('n') => {
                             self.popup_show = false;
@@ -79,11 +93,7 @@ impl App {
                         }
                         _ => {}
                     }
-                }
-            } else {
-                if let Event::Key(key) = event::read()?
-                    && key.kind == event::KeyEventKind::Press
-                {
+                } else {
                     match key.code {
                         KeyCode::Left => {
                             if self.cursor_col > 0 {
@@ -225,7 +235,16 @@ impl App {
 
         if self.popup_show {
             let popup = Block::bordered().title(self.popup_title.to_string());
-            let popup_area = self.centered_area(area, 60, 40, 40, 10, 80, 25);
+            let popup_area = self.centered_area(
+                area,
+                Percent { x: 60, y: 40 },
+                Limits {
+                    min_width: 40,
+                    min_height: 10,
+                    max_width: 80,
+                    max_height: 25,
+                },
+            );
             let popup_inner_area = popup.inner(popup_area);
             let popup_layout = Layout::default()
                 .direction(Direction::Vertical)
@@ -264,21 +283,12 @@ impl App {
         }
     }
 
-    fn centered_area(
-        &self,
-        area: Rect,
-        percent_x: u16,
-        percent_y: u16,
-        min_width: u16,
-        min_height: u16,
-        max_width: u16,
-        max_height: u16,
-    ) -> Rect {
-        let mut popup_width = area.width * percent_x / 100;
-        let mut popup_height = area.height * percent_y / 100;
+    fn centered_area(&self, area: Rect, percent: Percent, limits: Limits) -> Rect {
+        let mut popup_width = area.width * percent.x / 100;
+        let mut popup_height = area.height * percent.y / 100;
 
-        popup_width = popup_width.clamp(min_width, max_width);
-        popup_height = popup_height.clamp(min_height, max_height);
+        popup_width = popup_width.clamp(limits.min_width, limits.max_width);
+        popup_height = popup_height.clamp(limits.min_height, limits.max_height);
 
         let x = area.x + (area.width.saturating_sub(popup_width)) / 2;
         let y = area.y + (area.height.saturating_sub(popup_height)) / 2;
