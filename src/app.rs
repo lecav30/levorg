@@ -155,7 +155,8 @@ impl App {
             }
 
             // Auto-scroll
-            let height = terminal.size()?.height as usize;
+            let height = (terminal.size()?.height as usize).saturating_sub(3);
+            // 3 for status line
 
             if self.cursor_row < self.scroll_row {
                 self.scroll_row = self.cursor_row;
